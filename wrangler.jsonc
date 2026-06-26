@@ -1,0 +1,9 @@
+{
+  "name": "memoryreel",
+  "compatibility_date": "2026-06-26",
+  "main": "./worker.js",
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS"
+  }
+}
