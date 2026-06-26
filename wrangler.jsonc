@@ -1,5 +1,5 @@
 {
-  "name": "memoryreel",
+  "name": "memory-reel",
   "compatibility_date": "2026-06-26",
   "main": "./worker.js",
   "assets": {
