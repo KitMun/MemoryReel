@@ -189,38 +189,19 @@ async function uploadClip(clip) {
     await updateClip({ ...clip, attempts: nextAttempt, status: "uploading" });
     setStatus(`Uploading ${clip.fileName}...`);
 
-    const tokenResponse = await fetch("/api/uploads/b2-token", {
+    const formData = new FormData();
+    formData.append("file", clip.blob, clip.fileName);
+    formData.append("fileName", clip.fileName);
+    formData.append("guestName", clip.guestName || "");
+    formData.append("createdAt", clip.createdAt);
+    formData.append("durationMs", String(clip.durationMs));
+
+    const uploadResponse = await fetch("/api/uploads/b2-upload", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         ...kioskAuthHeaders(),
       },
-      body: JSON.stringify({
-        fileName: clip.fileName,
-        contentType: clip.mimeType,
-        guestName: clip.guestName,
-        createdAt: clip.createdAt,
-        durationMs: clip.durationMs,
-      }),
-    });
-
-    if (!tokenResponse.ok) {
-      throw new Error(await readError(tokenResponse));
-    }
-
-    const uploadTarget = await tokenResponse.json();
-    const uploadResponse = await fetch(uploadTarget.uploadUrl, {
-      method: "POST",
-      headers: {
-        Authorization: uploadTarget.authorizationToken,
-        "Content-Type": clip.mimeType,
-        "X-Bz-File-Name": uploadTarget.encodedFileName,
-        "X-Bz-Content-Sha1": "do_not_verify",
-        "X-Bz-Info-guest-name": encodeMetadata(clip.guestName || "anonymous"),
-        "X-Bz-Info-created-at": encodeMetadata(clip.createdAt),
-        "X-Bz-Info-duration-ms": String(clip.durationMs),
-      },
-      body: clip.blob,
+      body: formData,
     });
 
     if (!uploadResponse.ok) {

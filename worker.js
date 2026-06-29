@@ -16,6 +16,10 @@ export default {
       return createB2UploadToken(request, env);
     }
 
+    if (url.pathname === "/api/uploads/b2-upload" && request.method === "POST") {
+      return proxyB2Upload(request, env);
+    }
+
     if (url.pathname.startsWith("/api/")) {
       return json({ error: "Not found" }, { status: 404 });
     }
@@ -61,6 +65,71 @@ async function createB2UploadToken(request, env) {
       fileName: objectName,
       encodedFileName: encodeB2FileName(objectName),
     });
+  } catch (error) {
+    return json({ error: error.message }, { status: 502 });
+  }
+}
+
+async function proxyB2Upload(request, env) {
+  const missing = REQUIRED_ENV.filter((key) => !env[key]);
+  if (missing.length > 0) {
+    return json(
+      { error: `Missing Worker configuration: ${missing.join(", ")}` },
+      { status: 500 }
+    );
+  }
+
+  if (request.headers.get("X-MemoryReel-Kiosk-Key") !== env.KIOSK_UPLOAD_KEY) {
+    return json({ error: "Kiosk upload key is missing or invalid" }, { status: 401 });
+  }
+
+  const contentType = request.headers.get("Content-Type");
+  if (!contentType || !contentType.startsWith("multipart/form-data")) {
+    return json({ error: "Expected multipart/form-data" }, { status: 400 });
+  }
+
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file");
+    const fileName = formData.get("fileName");
+    const guestName = formData.get("guestName");
+    const createdAt = formData.get("createdAt");
+    const durationMs = formData.get("durationMs");
+
+    if (!file || !fileName) {
+      return json({ error: "Missing file or fileName" }, { status: 400 });
+    }
+
+    const sanitizedFileName = sanitizeFileName(fileName);
+    if (!sanitizedFileName) {
+      return json({ error: "Invalid fileName" }, { status: 400 });
+    }
+
+    const authorized = await authorizeB2(env);
+    const uploadTarget = await getUploadUrl(authorized, env.B2_BUCKET_ID);
+    const prefix = sanitizePrefix(env.B2_FILE_PREFIX || "raw");
+    const objectName = `${prefix}/${sanitizedFileName}`;
+
+    const uploadResponse = await fetch(uploadTarget.uploadUrl, {
+      method: "POST",
+      headers: {
+        Authorization: uploadTarget.authorizationToken,
+        "Content-Type": file.type || "application/octet-stream",
+        "X-Bz-File-Name": encodeB2FileName(objectName),
+        "X-Bz-Content-Sha1": "do_not_verify",
+        "X-Bz-Info-guest-name": encodeMetadata(guestName || "anonymous"),
+        "X-Bz-Info-created-at": encodeMetadata(createdAt || new Date().toISOString()),
+        "X-Bz-Info-duration-ms": String(durationMs || "0"),
+      },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(`B2 upload failed: ${uploadResponse.status} ${errorText}`);
+    }
+
+    return json({ success: true, fileName: objectName });
   } catch (error) {
     return json({ error: error.message }, { status: 502 });
   }
@@ -128,6 +197,10 @@ function encodeB2FileName(fileName) {
     .split("/")
     .map((part) => encodeURIComponent(part))
     .join("/");
+}
+
+function encodeMetadata(value) {
+  return encodeURIComponent(value).replace(/%20/g, "+");
 }
 
 function json(payload, init = {}) {
