@@ -10,6 +10,7 @@ const recordButton = document.querySelector("#record-button");
 const cancelButton = document.querySelector("#cancel-button");
 const saveButton = document.querySelector("#save-button");
 const countdownProgress = document.querySelector("#countdown-progress");
+const brand = document.querySelector(".brand");
 const landingScreen = document.querySelector("#landing-screen");
 const previewScreen = document.querySelector("#preview-screen");
 const uploadStatus = document.querySelector("#upload-status");
@@ -69,8 +70,8 @@ function handleTouchStart(e) {
   e.preventDefault();
   if (isRecording) return;
   
-  holdTimer = setTimeout(() => {
-    startRecording();
+  holdTimer = setTimeout(async () => {
+    await startRecording();
   }, 200);
 }
 
@@ -98,6 +99,7 @@ async function startRecording() {
 
   isRecording = true;
   recordButton.classList.add("recording");
+  brand.classList.add("hidden");
   
   const mimeType = pickMimeType();
   chunks = [];
@@ -129,6 +131,7 @@ async function handleRecordingStopped() {
   
   isRecording = false;
   recordButton.classList.remove("recording");
+  brand.classList.remove("hidden");
   
   const durationMs = Date.now() - recordingStartedAt;
   const mimeType = mediaRecorder.mimeType || "video/webm";
