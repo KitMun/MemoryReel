@@ -196,6 +196,11 @@ async function uploadClip(clip) {
     formData.append("createdAt", clip.createdAt);
     formData.append("durationMs", String(clip.durationMs));
 
+    console.log("Uploading to /api/uploads/b2-upload");
+    console.log("Auth headers:", kioskAuthHeaders());
+    console.log("File size:", clip.blob.size);
+    console.log("File name:", clip.fileName);
+
     const uploadResponse = await fetch("/api/uploads/b2-upload", {
       method: "POST",
       headers: {
@@ -204,8 +209,13 @@ async function uploadClip(clip) {
       body: formData,
     });
 
+    console.log("Response status:", uploadResponse.status);
+    console.log("Response ok:", uploadResponse.ok);
+
     if (!uploadResponse.ok) {
-      throw new Error(await readError(uploadResponse));
+      const errorText = await readError(uploadResponse);
+      console.error("Upload failed:", errorText);
+      throw new Error(errorText);
     }
 
     await markUploaded(clip.id);
