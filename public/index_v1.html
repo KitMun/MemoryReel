@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111827" />
+  <title>MemoryReel Kiosk</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="recorder" aria-labelledby="page-title">
+      <div class="brand">
+        <p class="eyebrow">Wedding wishes</p>
+        <h1 id="page-title">MemoryReel</h1>
+      </div>
+
+      <div class="stage">
+        <video id="preview" class="preview" playsinline muted autoplay></video>
+        <div id="empty-state" class="empty-state">
+          <span class="record-dot" aria-hidden="true"></span>
+          <p>Tap record when you are ready.</p>
+        </div>
+        <div id="countdown" class="countdown" aria-live="polite">00:30</div>
+      </div>
+
+      <form id="guest-form" class="guest-form">
+        <label for="guest-name">Name optional</label>
+        <input id="guest-name" name="guestName" type="text" maxlength="80" autocomplete="off" placeholder="Your name" />
+      </form>
+
+      <div class="controls">
+        <button id="record-button" class="primary" type="button">Record</button>
+        <button id="stop-button" class="danger" type="button" disabled>Stop</button>
+      </div>
+
+      <p id="status" class="status" role="status" aria-live="polite">Ready for the first message.</p>
+    </section>
+
+    <aside class="queue-panel" aria-labelledby="queue-title">
+      <div>
+        <p class="eyebrow">Upload queue</p>
+        <h2 id="queue-title">Buffered clips</h2>
+      </div>
+      <dl class="stats">
+        <div>
+          <dt>Waiting</dt>
+          <dd id="pending-count">0</dd>
+        </div>
+        <div>
+          <dt>Uploaded</dt>
+          <dd id="uploaded-count">0</dd>
+        </div>
+      </dl>
+      <button id="retry-button" class="secondary" type="button">Retry uploads</button>
+      <p class="hint">Clips are saved on this phone before upload starts, so weak WiFi can recover.</p>
+    </aside>
+  </main>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
