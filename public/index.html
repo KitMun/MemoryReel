@@ -24,13 +24,17 @@
       </div>
       
       <div class="record-container">
-        <button id="record-button" class="record-button" type="button">
-          <div class="record-button-inner"></div>
-        </button>
+        <div class="countdown-ring">
+          <svg class="countdown-svg" viewBox="0 0 100 100">
+            <circle class="countdown-bg" cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="4"/>
+            <circle id="countdown-progress" class="countdown-progress" cx="50" cy="50" r="46" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" transform="rotate(-90 50 50)" stroke-dasharray="289" stroke-dashoffset="0"/>
+          </svg>
+          <button id="record-button" class="record-button" type="button">
+            <div class="record-button-inner"></div>
+          </button>
+        </div>
         <p class="record-hint">Touch & hold to record</p>
       </div>
-      
-      <div id="countdown" class="countdown">0:30</div>
     </div>
   </div>
 

@@ -9,7 +9,7 @@ const videoPreview = document.querySelector("#video-preview");
 const recordButton = document.querySelector("#record-button");
 const cancelButton = document.querySelector("#cancel-button");
 const saveButton = document.querySelector("#save-button");
-const countdown = document.querySelector("#countdown");
+const countdownProgress = document.querySelector("#countdown-progress");
 const landingScreen = document.querySelector("#landing-screen");
 const previewScreen = document.querySelector("#preview-screen");
 const uploadStatus = document.querySelector("#upload-status");
@@ -207,14 +207,16 @@ async function saveRecording() {
 }
 
 function updateRecordingCountdown() {
-  const elapsedSeconds = Math.floor((Date.now() - recordingStartedAt) / 1000);
-  updateCountdown(Math.max(0, MAX_RECORDING_SECONDS - elapsedSeconds));
+  const elapsedSeconds = (Date.now() - recordingStartedAt) / 1000;
+  const remainingSeconds = Math.max(0, MAX_RECORDING_SECONDS - elapsedSeconds);
+  updateCountdown(remainingSeconds);
 }
 
 function updateCountdown(seconds) {
-  const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const secs = String(seconds % 60).padStart(2, "0");
-  countdown.textContent = `${mins}:${secs}`;
+  const circumference = 2 * Math.PI * 46;
+  const progress = seconds / MAX_RECORDING_SECONDS;
+  const offset = circumference * (1 - progress);
+  countdownProgress.style.strokeDashoffset = offset;
 }
 
 function pickMimeType() {
@@ -238,7 +240,7 @@ async function uploadClip(clip) {
   const nextAttempt = clip.attempts + 1;
   try {
     await updateClip({ ...clip, attempts: nextAttempt, status: "uploading" });
-    showUploadStatus(`Uploading ${clip.fileName}...`);
+    showUploadStatus("Uploading your wish...");
 
     const formData = new FormData();
     formData.append("file", clip.blob, clip.fileName);
@@ -262,7 +264,7 @@ async function uploadClip(clip) {
     await markUploaded(clip.id);
   } catch (error) {
     await updateClip({ ...clip, attempts: nextAttempt, status: "pending", lastError: error.message });
-    showUploadStatus(`Upload failed: ${error.message}`);
+    showUploadStatus("Upload failed. Please try again.");
     setTimeout(hideUploadStatus, 3000);
   }
 }
