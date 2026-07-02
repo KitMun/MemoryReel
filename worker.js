@@ -144,7 +144,7 @@ async function authorizeB2(env) {
   });
 
   if (!response.ok) {
-    throw new Error(`B2 authorization failed: ${response.status}`);
+    throw new Error(`B2 authorization failed: ${response.status} key ${env.B2_KEY_ID} application key ${env.B2_APPLICATION_KEY.substring(0, 8)}...`);
   }
 
   const data = await response.json();
