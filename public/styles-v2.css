@@ -106,6 +106,29 @@ body {
   z-index: 10;
 }
 
+.switch-camera {
+  position: absolute;
+  right: 40px;
+  bottom: 50px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.switch-camera:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .countdown-ring {
   position: relative;
   width: 100px;
@@ -165,6 +188,22 @@ body {
   height: 28px;
   border-radius: 6px;
   background: #ff3b30;
+}
+
+.record-button.recording.hands-free .record-button-inner {
+  display: none;
+}
+
+.lock-icon {
+  position: absolute;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.record-button.recording.hands-free .lock-icon {
+  display: flex;
 }
 
 .record-hint {
@@ -271,9 +310,24 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
+.success-icon {
+  animation: scaleIn 0.3s ease-out;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 

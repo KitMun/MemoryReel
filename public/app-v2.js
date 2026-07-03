@@ -11,10 +11,14 @@ const cancelButton = document.querySelector("#cancel-button");
 const saveButton = document.querySelector("#save-button");
 const countdownProgress = document.querySelector("#countdown-progress");
 const brand = document.querySelector(".brand");
+const switchCameraButton = document.querySelector("#switch-camera");
+const lockIcon = document.querySelector("#lock-icon");
 const landingScreen = document.querySelector("#landing-screen");
 const previewScreen = document.querySelector("#preview-screen");
 const uploadStatus = document.querySelector("#upload-status");
 const statusText = document.querySelector("#status-text");
+const uploadSpinner = document.querySelector("#upload-spinner");
+const uploadSuccessIcon = document.querySelector("#upload-success-icon");
 
 let mediaStream;
 let mediaRecorder;
@@ -24,7 +28,11 @@ let countdownInterval;
 let autoStopTimeout;
 let currentClip = null;
 let isRecording = false;
+let isHandsFree = false;
 let holdTimer = null;
+let touchStartY = 0;
+let currentFacingMode = "user";
+let availableCameras = [];
 
 init();
 
@@ -32,9 +40,11 @@ async function init() {
   captureSetupKey();
   updateCountdown(MAX_RECORDING_SECONDS);
   await openDb();
+  await checkAvailableCameras();
   await startCamera();
   setupTouchAndHold();
   setupPreviewActions();
+  setupSwitchCamera();
   await registerServiceWorker();
 }
 
@@ -46,7 +56,7 @@ async function startCamera() {
         noiseSuppression: true,
       },
       video: {
-        facingMode: "user",
+        facingMode: currentFacingMode,
         width: { ideal: 1280 },
         height: { ideal: 720 },
       },
@@ -56,6 +66,35 @@ async function startCamera() {
     console.error("Camera failed:", error);
     statusText.textContent = "Camera access required";
   }
+}
+
+async function checkAvailableCameras() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    availableCameras = devices.filter(device => device.kind === 'videoinput');
+    
+    if (availableCameras.length > 1) {
+      switchCameraButton.style.display = 'flex';
+    }
+  } catch (error) {
+    console.error("Failed to check cameras:", error);
+  }
+}
+
+async function switchCamera() {
+  if (availableCameras.length <= 1) return;
+  
+  currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
+  
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop());
+  }
+  
+  await startCamera();
+}
+
+function setupSwitchCamera() {
+  switchCameraButton.addEventListener("click", switchCamera);
 }
 
 function setupTouchAndHold() {
@@ -68,7 +107,14 @@ function setupTouchAndHold() {
 
 function handleTouchStart(e) {
   e.preventDefault();
-  if (isRecording) return;
+  if (isRecording && isHandsFree) return;
+  
+  if (isRecording) {
+    stopRecording();
+    return;
+  }
+  
+  touchStartY = e.touches ? e.touches[0].clientY : e.clientY;
   
   holdTimer = setTimeout(async () => {
     await startRecording();
@@ -77,14 +123,29 @@ function handleTouchStart(e) {
 
 function handleTouchEnd(e) {
   e.preventDefault();
+  
   if (holdTimer) {
     clearTimeout(holdTimer);
     holdTimer = null;
   }
   
-  if (isRecording) {
-    stopRecording();
+  if (isRecording && !isHandsFree) {
+    const touchEndY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    const swipeDistance = touchStartY - touchEndY;
+    
+    if (swipeDistance > 50) {
+      enableHandsFree();
+    } else {
+      stopRecording();
+    }
   }
+}
+
+function enableHandsFree() {
+  isHandsFree = true;
+  recordButton.classList.add("hands-free");
+  lockIcon.style.display = "flex";
+  switchCameraButton.style.display = "flex";
 }
 
 function setupPreviewActions() {
@@ -130,8 +191,17 @@ async function handleRecordingStopped() {
   clearTimeout(autoStopTimeout);
   
   isRecording = false;
+  isHandsFree = false;
   recordButton.classList.remove("recording");
+  recordButton.classList.remove("hands-free");
   brand.classList.remove("hidden");
+  lockIcon.style.display = "none";
+  
+  if (availableCameras.length > 1) {
+    switchCameraButton.style.display = "flex";
+  } else {
+    switchCameraButton.style.display = "none";
+  }
   
   const durationMs = Date.now() - recordingStartedAt;
   const mimeType = mediaRecorder.mimeType || "video/webm";
@@ -265,6 +335,7 @@ async function uploadClip(clip) {
     }
 
     await markUploaded(clip.id);
+    showUploadSuccess();
   } catch (error) {
     await updateClip({ ...clip, attempts: nextAttempt, status: "pending", lastError: error.message });
     showUploadStatus("Upload failed. Please try again.");
@@ -274,7 +345,17 @@ async function uploadClip(clip) {
 
 function showUploadStatus(message) {
   statusText.textContent = message;
+  uploadSpinner.style.display = "block";
+  uploadSuccessIcon.style.display = "none";
   uploadStatus.classList.add("active");
+}
+
+function showUploadSuccess() {
+  statusText.textContent = "Your wish has been saved!";
+  uploadSpinner.style.display = "none";
+  uploadSuccessIcon.style.display = "block";
+  uploadStatus.classList.add("active");
+  setTimeout(hideUploadStatus, 2000);
 }
 
 function hideUploadStatus() {
