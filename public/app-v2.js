@@ -83,6 +83,7 @@ async function checkAvailableCameras() {
 
 async function switchCamera() {
   if (availableCameras.length <= 1) return;
+  if (isRecording) return;
   
   currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
   
@@ -107,10 +108,12 @@ function setupTouchAndHold() {
 
 function handleTouchStart(e) {
   e.preventDefault();
-  if (isRecording && isHandsFree) return;
   
   if (isRecording) {
-    stopRecording();
+    if (isHandsFree) {
+      stopRecording();
+      return;
+    }
     return;
   }
   
@@ -276,7 +279,6 @@ async function saveRecording() {
   
   showUploadStatus("Uploading...");
   await processUploadQueue();
-  hideUploadStatus();
 }
 
 function updateRecordingCountdown() {
