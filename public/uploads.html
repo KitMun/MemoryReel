@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Uploads - MemoryReel</title>
+  <link rel="stylesheet" href="/styles-uploads.css">
+  <meta name="theme-color" content="#000">
+</head>
+<body>
+  <div class="uploads-page">
+    <header class="header">
+      <button id="back-button" class="back-button" type="button">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1>Uploads</h1>
+    </header>
+
+    <div class="content">
+      <div id="clips-list" class="clips-list">
+        <p class="empty-message">No clips yet</p>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <button id="retry-all-button" class="retry-button" type="button" style="display: none;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        <span>Retry Failed Uploads</span>
+      </button>
+    </footer>
+  </div>
+
+  <script src="/app-uploads.js" type="module"></script>
+</body>
+</html>

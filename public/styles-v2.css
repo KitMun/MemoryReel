@@ -48,6 +48,30 @@ body {
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
+.uploads-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 20;
+}
+
+.uploads-button:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .brand.hidden {
   opacity: 0;
   transform: translateY(-20px);

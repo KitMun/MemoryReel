@@ -13,6 +13,7 @@ const countdownProgress = document.querySelector("#countdown-progress");
 const brand = document.querySelector(".brand");
 const switchCameraButton = document.querySelector("#switch-camera");
 const lockIcon = document.querySelector("#lock-icon");
+const uploadsButton = document.querySelector("#uploads-button");
 const landingScreen = document.querySelector("#landing-screen");
 const previewScreen = document.querySelector("#preview-screen");
 const uploadStatus = document.querySelector("#upload-status");
@@ -45,6 +46,7 @@ async function init() {
   setupTouchAndHold();
   setupPreviewActions();
   setupSwitchCamera();
+  setupUploadsNavigation();
   await registerServiceWorker();
 }
 
@@ -98,6 +100,12 @@ function setupSwitchCamera() {
   switchCameraButton.addEventListener("click", switchCamera);
 }
 
+function setupUploadsNavigation() {
+  uploadsButton.addEventListener("click", () => {
+    window.location.href = "/uploads.html";
+  });
+}
+
 function setupTouchAndHold() {
   recordButton.addEventListener("touchstart", handleTouchStart, { passive: false });
   recordButton.addEventListener("touchend", handleTouchEnd, { passive: false });
@@ -148,7 +156,6 @@ function enableHandsFree() {
   isHandsFree = true;
   recordButton.classList.add("hands-free");
   lockIcon.style.display = "flex";
-  switchCameraButton.style.display = "flex";
 }
 
 function setupPreviewActions() {
@@ -164,6 +171,7 @@ async function startRecording() {
   isRecording = true;
   recordButton.classList.add("recording");
   brand.classList.add("hidden");
+  switchCameraButton.style.display = "none";
   
   const mimeType = pickMimeType();
   chunks = [];
