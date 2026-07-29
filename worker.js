@@ -1,4 +1,30 @@
-const REQUIRED_ENV = ["B2_KEY_ID", "B2_APPLICATION_KEY", "B2_BUCKET_ID", "KIOSK_UPLOAD_KEY"];
+const REQUIRED_ENV = ["B2_KEY_ID", "B2_APPLICATION_KEY", "B2_BUCKET_ID", "KIOSK_UPLOAD_KEY", "LOCAL_WORKER_KEY"];
+
+async function createJob(env, jobData) {
+  const stmt = env.DB.prepare(
+    "INSERT INTO jobs (id, video_file_path, status, guest_name, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  );
+  await stmt.bind(jobData.id, jobData.videoFilePath, 'queued', jobData.guestName, jobData.durationMs, jobData.createdAt).all();
+}
+
+async function getNextJob(env) {
+  const stmt = env.DB.prepare(
+    "SELECT * FROM jobs WHERE status = 'queued' AND retry_count < 3 ORDER BY created_at ASC LIMIT 1"
+  );
+  return await stmt.first();
+}
+
+async function updateJobStatus(env, jobId, status, updates = {}) {
+  const fields = ['status', ...Object.keys(updates)];
+  const placeholders = fields.map(() => '?').join(', ');
+  const values = [status, ...Object.values(updates), jobId];
+
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const stmt = env.DB.prepare(
+    `UPDATE jobs SET ${setClause} WHERE id = ?`
+  );
+  await stmt.bind(...values).all();
+}
 
 export default {
   async fetch(request, env) {
@@ -18,6 +44,18 @@ export default {
 
     if (url.pathname === "/api/uploads/b2-upload" && request.method === "POST") {
       return proxyB2Upload(request, env);
+    }
+
+    if (url.pathname === "/api/jobs/next" && request.method === "GET") {
+      return getNextJobEndpoint(request, env);
+    }
+
+    if (url.pathname.match(/^\/api\/jobs\/[^/]+\/status$/) && request.method === "POST") {
+      return updateJobStatusEndpoint(request, env);
+    }
+
+    if (url.pathname.match(/^\/api\/jobs\/[^/]+\/transcript$/) && request.method === "POST") {
+      return uploadTranscriptEndpoint(request, env);
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -129,7 +167,16 @@ async function proxyB2Upload(request, env) {
       throw new Error(`B2 upload failed: ${uploadResponse.status} ${errorText}`);
     }
 
-    return json({ success: true, fileName: objectName });
+    const jobId = crypto.randomUUID();
+    await createJob(env, {
+      id: jobId,
+      videoFilePath: objectName,
+      guestName: guestName || null,
+      durationMs: parseInt(durationMs) || 0,
+      createdAt: new Date().toISOString()
+    });
+
+    return json({ success: true, fileName: objectName, jobId });
   } catch (error) {
     return json({ error: error.message }, { status: 502 });
   }
@@ -218,6 +265,70 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-MemoryReel-Kiosk-Key",
+    "Access-Control-Allow-Headers": "Content-Type, X-MemoryReel-Kiosk-Key, X-Local-Worker-Key",
   };
+}
+
+async function getNextJobEndpoint(request, env) {
+  if (request.headers.get("X-Local-Worker-Key") !== env.LOCAL_WORKER_KEY) {
+    return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const job = await getNextJob(env);
+    return json(job || null);
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function updateJobStatusEndpoint(request, env) {
+  if (request.headers.get("X-Local-Worker-Key") !== env.LOCAL_WORKER_KEY) {
+    return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const jobId = url.pathname.split('/')[3];
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Expected JSON request body" }, { status: 400 });
+  }
+
+  try {
+    await updateJobStatus(env, jobId, body.status, body.updates || {});
+    return json({ success: true });
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function uploadTranscriptEndpoint(request, env) {
+  if (request.headers.get("X-Local-Worker-Key") !== env.LOCAL_WORKER_KEY) {
+    return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const jobId = url.pathname.split('/')[3];
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Expected JSON request body" }, { status: 400 });
+  }
+
+  try {
+    await updateJobStatus(env, jobId, 'completed', {
+      transcript_file_path: body.transcriptPath,
+      suggested_start_ms: body.suggestedStartMs,
+      suggested_end_ms: body.suggestedEndMs,
+      suggested_score: body.suggestedScore,
+      suggested_reason: body.suggestedReason,
+      completed_at: new Date().toISOString()
+    });
+    return json({ success: true });
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
 }

@@ -1,9 +1,16 @@
 {
-  "name": "memory-reel",
-  "compatibility_date": "2026-06-26",
-  "main": "./worker.js",
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS"
-  }
+	"name": "memory-reel",
+	"compatibility_date": "2026-06-26",
+	"main": "./worker.js",
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "memoryreel-jobs",
+			"database_id": "9e5e1d33-a3ce-4b5c-8f33-1c9016885c10"
+		}
+	]
 }

@@ -414,5 +414,878 @@ Two independent paths process every uploaded clip:
     desired; not required (Cloudflare Pages provides a free subdomain).
 
 ================================================================================
+10. IMPLEMENTATION UPDATE - PART 1 KIOSK RECORDER
+================================================================================
+
+STATUS
+  Part 1 has been implemented on branch:
+
+    codex/kiosk-recorder
+
+  Commit:
+
+    e7e5dd3 Build kiosk recorder PWA
+
+WHAT WAS BUILT
+  - Replaced the placeholder root page with a kiosk-ready PWA under:
+
+      public/
+
+  - Added a browser recording flow:
+      - Camera/microphone capture through MediaRecorder.
+      - Live camera preview.
+      - 30-second recording cap for the first implementation.
+      - Optional guest name field.
+      - Record and stop controls.
+      - Visible upload queue counts.
+
+  - Added local buffering before upload:
+      - Recorded Blob is saved into IndexedDB before upload starts.
+      - Pending clips remain on the phone if upload fails.
+      - Upload queue retries when the user taps retry or the browser comes
+        back online.
+      - Clips stuck in "uploading" after a page close are retried on reopen.
+
+  - Added PWA shell files:
+      - manifest.webmanifest
+      - service-worker.js
+      - icon.svg
+
+  - Moved public web assets into public/ and changed wrangler.jsonc so
+    Cloudflare serves only public assets, not repo internals.
+
+  - Added Worker upload-token endpoint:
+
+      POST /api/uploads/b2-token
+
+    The Worker holds the Backblaze B2 credentials and returns a temporary B2
+    upload target to the browser. This keeps real B2 credentials out of the
+    kiosk phone/browser code.
+
+  - Added kiosk upload protection:
+      - Worker requires X-MemoryReel-Kiosk-Key.
+      - The kiosk phone stores this shared key in localStorage after first
+        setup using a setupKey URL parameter.
+      - Guests do not need login or credentials.
+
+  - Added setup documentation:
+
+      docs/kiosk-setup.md
+
+REQUIRED DEPLOYMENT CONFIGURATION
+  Cloudflare Worker secrets:
+
+    B2_KEY_ID
+    B2_APPLICATION_KEY
+    B2_BUCKET_ID
+    KIOSK_UPLOAD_KEY
+
+  Optional Worker variable:
+
+    B2_FILE_PREFIX=raw
+
+  Backblaze B2 bucket CORS must allow the deployed kiosk origin and these
+  upload-related headers:
+
+    Authorization
+    Content-Type
+    X-MemoryReel-Kiosk-Key
+    X-Bz-File-Name
+    X-Bz-Content-Sha1
+    X-Bz-Info-guest-name
+    X-Bz-Info-created-at
+    X-Bz-Info-duration-ms
+
+  The B2 Application Key should be scoped to the clip bucket and needs
+  writeFiles capability.
+
+HOW TO SET UP THE KIOSK PHONE
+  After deployment and Worker secret setup, open the deployed kiosk URL once
+  on the kiosk phone with:
+
+    https://YOUR-KIOSK-URL/?setupKey=YOUR_KIOSK_UPLOAD_KEY
+
+  The app saves the key in the phone browser's localStorage and removes it
+  from the address bar. After that, guests can use the normal kiosk URL.
+
+VERIFICATION ALREADY DONE
+  - JavaScript syntax checks:
+      node --check public/app.js
+      node --check public/service-worker.js
+      node --check worker.js
+
+  - Local static asset checks:
+      / served successfully
+      /app.js served successfully
+      /manifest.webmanifest served successfully
+
+  - Browser desktop smoke check:
+      - Page title loads as "MemoryReel Kiosk".
+      - Record button is visible.
+      - Stop button starts disabled.
+      - No horizontal overflow on desktop viewport.
+
+IMPORTANT NOTES FOR FURTHER DEVELOPMENT
+  - Test on the exact kiosk phone before the wedding. MediaRecorder support,
+    camera permission behavior, video codec, and fullscreen/kiosk behavior
+    can differ by device and browser.
+
+  - The current recording cap is 30 seconds. This can be changed in
+    public/app.js via MAX_RECORDING_SECONDS after the final event decision.
+
+  - The current browser upload uses Backblaze's native upload URL flow.
+    Confirm the B2 CORS configuration early; if CORS blocks direct upload,
+    the phone will correctly keep clips buffered, but no uploads will reach
+    B2 until CORS is fixed.
+
+  - The Worker upload-token endpoint is intentionally lightweight. It does
+    not yet write a separate metadata JSON file, notify the processing
+    pipeline, or create database records. Those should be added in Part 2.
+
+  - The app currently uploads only the recorded video file. For the fast
+    transcription path, consider adding an audio sidecar upload in a later
+    iteration so Cloudflare Workers do not need to run ffmpeg.
+
+  - The setupKey approach is practical for a one-phone kiosk, but it relies
+    on localStorage. If the browser data is cleared, the kiosk must be opened
+    once again with the setupKey URL.
+
+  - The PWA service worker caches the app shell, but not recorded clips.
+    Recorded clips live in IndexedDB until successfully uploaded.
+
+  - Uploaded records marked "uploaded" keep metadata but drop the Blob from
+    IndexedDB to save phone storage. If a post-upload audit UI is needed,
+    add a small admin/debug view rather than keeping uploaded videos locally.
+
+  - Before the event, run a realistic test:
+      1. Record several clips on the actual phone.
+      2. Toggle WiFi/airplane mode during upload.
+      3. Confirm retries resume.
+      4. Confirm files arrive in the B2 bucket under the expected prefix.
+      5. Confirm guest-name metadata is present or acceptable if omitted.
+
+================================================================================
+11. IDEA TO REPLACE WHISPER API WITH LOCAL FASTER-WHISPER
+================================================================================
+
+# Local Speech-to-Text with Faster-Whisper
+
+## Overview
+
+Instead of using the OpenAI Whisper API, this project uses **faster-whisper** to perform speech-to-text transcription locally. The transcription model runs on the local machine, eliminating API calls and per-minute usage charges.
+
+The application is designed for processing short Mandarin audio clips (typically 15–60 seconds) that arrive periodically rather than in large batches.
+
+## Why Replace the Whisper API?
+
+### Pros
+
+* **No API cost** after the initial setup.
+* **Offline operation** – audio never leaves the local machine.
+* **Low latency** – no network upload or download required.
+* **No rate limits** imposed by external services.
+* **Easy to customize** with domain-specific prompts and vocabulary.
+* **Suitable for one-time or temporary deployments** without ongoing cloud expenses.
+
+### Cons
+
+* Requires a local machine with sufficient CPU/RAM.
+* Initial model download (1–3 GB depending on the model).
+* Transcription speed depends on the host hardware.
+* Updates and model management become part of the application maintenance.
+
+## Recommended Model
+
+| Model    | Recommendation                              |
+| -------- | ------------------------------------------- |
+| Small    | Fastest, suitable for general transcription |
+| Medium   | Recommended balance of speed and accuracy   |
+| Large-v3 | Highest accuracy, slower inference          |
+
+For Mandarin speech with names, company terms, and industry-specific vocabulary, the **Medium** model is recommended as the default. The **Large-v3** model can be used when maximum transcription accuracy is required.
+
+## Implementation Summary
+
+1. Monitor for new audio clips.
+2. Load the Faster-Whisper model during application startup.
+3. Transcribe incoming audio locally.
+4. Provide an optional Mandarin vocabulary list as an `initial_prompt` to improve recognition of expected names and terminology.
+5. Optionally perform post-processing to correct common names or domain-specific terms.
+6. Save the transcription result and continue waiting for the next audio clip.
+
+```
+Incoming Audio
+       │
+       ▼
+Faster-Whisper
+ (Local Model)
+       │
+       ▼
+Optional Vocabulary Prompt
+       │
+       ▼
+Transcript
+       │
+       ▼
+Optional Post-processing
+       │
+       ▼
+Output (Text / JSON)
+```
+
+## Hardware Considerations
+
+Recommended minimum for local execution:
+
+* Intel Core Ultra 7 (or equivalent modern CPU)
+* 32 GB RAM
+* SSD storage
+* Approximately 5 GB free disk space if both `medium` and `large-v3` models are installed
+
+For workloads where audio clips arrive every few minutes, CPU-only inference is sufficient and does not require a dedicated NVIDIA GPU.
+
+## Future Enhancements
+
+* Automatic language detection
+* Speaker diarization (multiple speakers)
+* Confidence score reporting
+* Batch processing support
+* Vocabulary management per customer or project
+* Export to JSON, CSV, or subtitle formats
+
+
+================================================================================
+IDEA ON NOISE REDUCTION TO IMPROVE TRANSCIPT QUALITY
+================================================================================
+
+# Audio Quality Enhancement Pipeline
+
+## Overview
+
+To improve speech recognition accuracy before sending audio to the transcription model, the system applies two levels of audio enhancement:
+
+1. **Browser-level audio processing during recording**
+2. **Post-processing noise reduction before transcription**
+
+The goal is to provide Whisper/faster-whisper with cleaner speech input, improving recognition accuracy for Mandarin speech, names, and domain-specific terms.
+
+---
+
+# 1. Browser Audio Processing
+
+The PWA should request audio with built-in browser processing enabled.
+
+Example:
+
+```javascript
+const stream = await navigator.mediaDevices.getUserMedia({
+  video: true,
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true
+  }
+});
+```
+
+## Enabled Features
+
+### Echo Cancellation
+
+Reduces feedback and echo caused by:
+
+* Device speakers
+* Room reflections
+* Nearby audio playback
+
+Useful when recording in environments where audio output may exist.
+
+---
+
+### Noise Suppression
+
+Reduces common background noise such as:
+
+* Fan noise
+* Air conditioning
+* Constant machine noise
+* General background sounds
+
+This provides the first layer of cleanup before recording.
+
+---
+
+### Auto Gain Control
+
+Automatically adjusts microphone volume.
+
+Benefits:
+
+* Prevents very quiet recordings
+* Reduces overly loud audio
+* Keeps speech volume more consistent
+
+---
+
+# 2. Post-Processing Noise Reduction
+
+After video upload, the audio is extracted and processed before transcription.
+
+Pipeline:
+
+```
+Recorded Video
+        |
+        ▼
+Extract Audio
+        |
+        ▼
+Noise Reduction
+        |
+        ▼
+faster-whisper Transcription
+        |
+        ▼
+Transcript Output
+```
+
+---
+
+# Preferred Approach: AI Speech Enhancement
+
+The preferred noise reduction approach is using an AI-based speech enhancement model.
+
+Unlike traditional filters, AI enhancement models learn the difference between speech and noise, allowing them to preserve human voice while reducing unwanted sounds.
+
+Examples:
+
+* DeepFilterNet
+* RNNoise
+
+## Advantages
+
+* Better speech isolation
+* Handles more complex environments
+* Improves transcription accuracy
+* More suitable for real-world recordings
+
+## Limitations
+
+* Higher processing requirements
+* Additional model dependency
+* Slightly longer processing time
+
+For short clips (15–60 seconds), the additional processing time is acceptable because the system is not operating under strict real-time constraints.
+
+---
+
+# Alternative Approach: FFmpeg Audio Filtering
+
+For simpler deployments, FFmpeg filters can be applied before transcription.
+
+Example processing steps:
+
+```
+Extract Audio
+
+↓
+
+Normalize Volume
+
+↓
+
+Reduce Background Noise
+
+↓
+
+Adjust Frequency Range
+
+↓
+
+Whisper Transcription
+```
+
+Typical improvements:
+
+* Remove constant background noise
+* Improve speech volume consistency
+* Reduce low-frequency hum
+
+Advantages:
+
+* Lightweight
+* Fast
+* Easy to deploy
+* No additional AI model required
+
+Limitations:
+
+* Less effective with complex noise
+* Cannot distinguish speech from overlapping voices as well as AI models
+
+---
+
+# Recommended Processing Strategy
+
+Initial implementation:
+
+```
+PWA Recording
+      |
+      ▼
+MediaRecorder
+      |
+      ▼
+Browser Audio Processing
+      |
+      ▼
+Upload Video
+      |
+      ▼
+Extract Audio
+      |
+      ▼
+AI Noise Reduction
+      |
+      ▼
+faster-whisper
+      |
+      ▼
+Transcript
+```
+
+Fallback/simple mode:
+
+```
+PWA Recording
+      |
+      ▼
+MediaRecorder
+      |
+      ▼
+Extract Audio
+      |
+      ▼
+FFmpeg Filter
+      |
+      ▼
+faster-whisper
+```
+
+---
+
+# Expected Impact
+
+Improving audio quality can have a larger effect on transcription accuracy than switching between Whisper model sizes.
+
+A clean recording with a smaller model may outperform a noisy recording with a larger model.
+
+The enhancement pipeline is especially beneficial for:
+
+* Mandarin speech recognition
+* Names and proper nouns
+* Industrial environments
+* Outdoor recordings
+* Recordings with background noise
+
+---
+
+# Future Improvements
+
+Possible enhancements:
+
+* Automatic audio quality scoring before transcription
+* Adaptive selection between FFmpeg and AI enhancement
+* Speaker diarization for multi-person conversations
+* Customer/project-specific vocabulary enhancement
+* Real-time microphone quality feedback in the PWA
+
+
+================================================================================
+IDEA ON ARCHITECTURE
+================================================================================
+
+# System Architecture
+
+## Overview
+
+The application is designed around a lightweight cloud orchestration layer and a dedicated AI processing worker.
+
+The cloud is responsible for coordinating jobs and maintaining application state, while the AI worker performs the computationally intensive tasks such as audio processing and speech transcription.
+
+This separation allows the system to leverage free-tier cloud resources for orchestration while keeping AI processing independent and easily scalable.
+
+---
+
+# Architecture Diagram
+
+```text
+                           PWA (JavaScript)
+                                  │
+                                  │ Upload Video
+                                  ▼
+                         Backblaze B2 Storage
+                                  │
+                                  ▼
+                     Cloudflare Worker (API)
+                                  │
+            ┌─────────────────────┴─────────────────────┐
+            │                                           │
+            ▼                                           ▼
+     Cloudflare D1 Database                 Cloudflare Queue
+     (Job Metadata & Status)                (Processing Queue)
+            │                                           │
+            └─────────────────────┬─────────────────────┘
+                                  ▼
+                      Oracle OCI Compute Instance
+                         Python Transcription Worker
+                                  │
+              ┌───────────────────┼────────────────────┐
+              │                   │                    │
+              ▼                   ▼                    ▼
+        Download Video        Extract Audio      AI Noise Reduction
+             (B2)               (FFmpeg)        (DeepFilterNet)
+                                                       │
+                                                       ▼
+                                               faster-whisper
+                                                       │
+                                                       ▼
+                                            Transcript Generation
+                                                       │
+                                                       ▼
+                                            Upload Transcript (B2)
+                                                       │
+                                                       ▼
+                                          Update Job Status (D1)
+```
+
+---
+
+# Component Responsibilities
+
+## PWA (JavaScript)
+
+Responsibilities:
+
+* Record video using `MediaRecorder`
+* Enable browser audio processing
+* Upload video to Backblaze B2
+* Create a transcription job
+* Poll for processing status
+* Display transcription results
+
+The frontend remains lightweight and does not perform any AI processing.
+
+---
+
+## Backblaze B2
+
+Responsibilities:
+
+* Store uploaded video files
+* Store generated transcripts
+* Serve as the application's file storage
+
+B2 is responsible only for storing files and should not be used as a job queue or status database.
+
+---
+
+## Cloudflare Worker
+
+Responsibilities:
+
+* Expose REST API endpoints
+* Authenticate requests
+* Create transcription jobs
+* Push jobs into the processing queue
+* Return job status
+* Generate download or upload URLs when required
+
+The Worker contains business logic but performs no CPU-intensive processing.
+
+---
+
+## Cloudflare D1
+
+Responsibilities:
+
+* Store job metadata
+* Track processing status
+* Record timestamps
+* Store processing errors
+* Store transcript locations
+
+Example job lifecycle:
+
+```text
+Queued
+    ↓
+Processing
+    ↓
+Completed
+```
+
+or
+
+```text
+Queued
+    ↓
+Processing
+    ↓
+Failed
+```
+
+---
+
+## Cloudflare Queue
+
+Responsibilities:
+
+* Hold pending transcription jobs
+* Deliver jobs to available workers
+* Decouple upload requests from AI processing
+
+Using a queue prevents uploads from waiting for transcription to complete and provides a scalable mechanism for distributing work.
+
+---
+
+## Oracle OCI Compute Instance
+
+Responsibilities:
+
+* Execute the Python transcription worker
+* Process queued jobs
+* Download videos from Backblaze B2
+* Perform AI inference
+* Upload completed transcripts
+* Update job status
+
+This instance performs all CPU-intensive workloads.
+
+---
+
+# Python Transcription Pipeline
+
+Each job follows the processing pipeline below:
+
+```text
+Download Video
+        │
+        ▼
+Extract Audio (FFmpeg)
+        │
+        ▼
+AI Noise Reduction
+(DeepFilterNet)
+        │
+        ▼
+Speech-to-Text
+(faster-whisper)
+        │
+        ▼
+Vocabulary Enhancement
+(Optional)
+        │
+        ▼
+Generate Transcript
+        │
+        ▼
+Upload Transcript
+```
+
+Future enhancements may include:
+
+* Speaker diarization
+* Confidence scoring
+* Automatic language detection
+* Multiple output formats (TXT, JSON, SRT)
+
+---
+
+# Design Principles
+
+## Separation of Responsibilities
+
+Each service has a clearly defined role.
+
+| Component         | Responsibility      |
+| ----------------- | ------------------- |
+| PWA               | User interaction    |
+| Backblaze B2      | File storage        |
+| Cloudflare Worker | API & orchestration |
+| Cloudflare D1     | Job metadata        |
+| Cloudflare Queue  | Work distribution   |
+| Oracle OCI        | AI processing       |
+
+This separation improves maintainability and allows individual components to evolve independently.
+
+---
+
+## Scalability
+
+The architecture supports future scaling without major redesign.
+
+Current deployment:
+
+```text
+1 Queue
+        │
+        ▼
+1 Python Worker
+```
+
+Future deployment:
+
+```text
+1 Queue
+        │
+ ┌──────┼──────┐
+ ▼      ▼      ▼
+Worker Worker Worker
+```
+
+Additional workers can process jobs concurrently without changes to the frontend or API.
+
+---
+
+## Cost Optimization
+
+The solution is designed to maximize the use of free-tier cloud services.
+
+| Component    | Platform                      |
+| ------------ | ----------------------------- |
+| Frontend     | Existing PWA                  |
+| API          | Cloudflare Workers (Free)     |
+| Database     | Cloudflare D1 (Free)          |
+| Queue        | Cloudflare Queues (Free Tier) |
+| AI Compute   | Oracle OCI Always Free        |
+| File Storage | Backblaze B2                  |
+
+Only Backblaze B2 incurs usage-based costs, while the orchestration layer and AI compute can operate within the available free-tier allocations for the expected project workload.
+
+---
+
+# Benefits
+
+* Low operational cost
+* Fully asynchronous processing
+* Decoupled architecture
+* AI processing isolated from application logic
+* Easy to scale with additional workers
+* Supports future AI enhancements without architectural changes
+* Leverages managed cloud services while keeping compute-intensive workloads under full control
+
+================================================================================
+12. LOCAL FASTER-WHISPER IMPLEMENTATION (CURRENT)
+================================================================================
+
+STATUS
+  The architecture has been updated to use local faster-whisper transcription
+  instead of OpenAI Whisper API, with Cloudflare D1 for job tracking.
+
+ARCHITECTURE
+  Kiosk PWA → B2 Upload → Worker creates D1 job → Local Python worker polls →
+  Download video → Extract audio → faster-whisper → Upload transcript → Update D1
+
+COMPONENTS
+  - Cloudflare D1 Database: Job metadata, status tracking, suggested clip segments
+  - Worker API: Job creation, polling endpoints, status updates
+  - Local Python CLI Worker: Polls for jobs, processes with faster-whisper
+  - Backblaze B2: Stores videos and generated transcripts
+
+D1 SCHEMA
+  Jobs table includes:
+  - id, video_file_path, transcript_file_path
+  - status (queued, processing, completed, failed)
+  - guest_name, duration_ms, timestamps
+  - error_message, retry_count (max 3 retries)
+  - suggested_start_ms, suggested_end_ms, suggested_score, suggested_reason
+
+WORKER API ENDPOINTS
+  - POST /api/uploads/b2-upload: Uploads video and creates D1 job
+  - GET /api/jobs/next: Poll for next queued job (requires LOCAL_WORKER_KEY)
+  - POST /api/jobs/:id/status: Update job status (requires LOCAL_WORKER_KEY)
+  - POST /api/jobs/:id/transcript: Upload transcript location (requires LOCAL_WORKER_KEY)
+
+LOCAL WORKER SETUP
+  See local-worker/README.md for detailed setup instructions.
+
+  Prerequisites:
+  - Python 3.10+, ffmpeg
+  - Backblaze B2 credentials
+  - Cloudflare Worker with D1 database
+
+  Configuration (local-worker/config.json):
+  - worker_api_url: Deployed Worker URL
+  - local_worker_key: Shared secret (matches Worker secret)
+  - B2 credentials and bucket name
+  - whisper_model: medium (recommended for Mandarin)
+
+  Running the worker:
+  cd local-worker
+  pip install -r requirements.txt
+  python main.py
+
+DEPLOYMENT STEPS
+  1. Create D1 database:
+     wrangler d1 create memoryreel-jobs
+
+  2. Update wrangler.jsonc with database_id from step 1
+
+  3. Run schema migration:
+     wrangler d1 execute memoryreel-jobs --file=schema.sql
+
+  4. Set Worker secret:
+     wrangler secret put LOCAL_WORKER_KEY
+
+  5. Deploy Worker:
+     wrangler deploy
+
+  6. Configure local-worker/config.json with credentials
+
+  7. Run local worker: python local-worker/main.py
+
+BENEFITS OVER OPENAI WHISPER API
+  - No API costs after initial setup
+  - Offline operation (audio never leaves local machine)
+  - No rate limits
+  - Easy customization with domain-specific prompts
+  - Suitable for one-time deployments without ongoing cloud expenses
+
+TRANSCRIPT FORMAT
+  JSON with word-level timestamps for both text and timing:
+  {
+    "language": "zh",
+    "language_probability": 0.98,
+    "segments": [
+      {
+        "start": 0.0,
+        "end": 2.5,
+        "text": "segment text",
+        "words": [
+          {"start": 0.0, "end": 0.5, "word": "word1"},
+          {"start": 0.6, "end": 1.2, "word": "word2"}
+        ]
+      }
+    ]
+  }
+
+  This format supports both the word cloud feature and the phrase-level
+  scoring algorithm for highlight reel generation.
+
+CLIP SEGMENT SUGGESTION
+  The local worker calculates suggested clip segments based on:
+  - Segment duration (prefer 2-5 seconds)
+  - Word count (more words = higher score)
+  - Future enhancement: name matching, blessing phrase detection
+
+  Results stored in D1 for highlight reel assembly.
+
+ERROR HANDLING
+  - Jobs marked as failed with error_message
+  - Automatic retry up to 3 times (retry_count field)
+  - Worker continues polling for other jobs if one fails
+
+================================================================================
 END OF DOCUMENT
 ================================================================================
