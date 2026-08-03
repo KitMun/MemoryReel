@@ -26,6 +26,27 @@ async function updateJobStatus(env, jobId, status, updates = {}) {
   await stmt.bind(...values).all();
 }
 
+async function getWordCloud(env) {
+  const stmt = env.DB.prepare(
+    "SELECT phrase, count FROM word_cloud ORDER BY count DESC"
+  );
+  const results = await stmt.all();
+  return results.results.map(row => ({
+    text: row.phrase,
+    count: row.count
+  }));
+}
+
+async function updateWordCloud(env, phrases) {
+  const now = new Date().toISOString();
+  for (const phrase of phrases) {
+    const stmt = env.DB.prepare(
+      "INSERT INTO word_cloud (phrase, count, updated_at) VALUES (?, 1, ?) ON CONFLICT(phrase) DO UPDATE SET count = count + 1, updated_at = ?"
+    );
+    await stmt.bind(phrase, now, now).all();
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -56,6 +77,14 @@ export default {
 
     if (url.pathname.match(/^\/api\/jobs\/[^/]+\/transcript$/) && request.method === "POST") {
       return uploadTranscriptEndpoint(request, env);
+    }
+
+    if (url.pathname === "/api/word-cloud" && request.method === "GET") {
+      return getWordCloudEndpoint(request, env);
+    }
+
+    if (url.pathname === "/api/word-cloud/update" && request.method === "POST") {
+      return updateWordCloudEndpoint(request, env);
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -327,6 +356,42 @@ async function uploadTranscriptEndpoint(request, env) {
       suggested_reason: body.suggestedReason,
       completed_at: new Date().toISOString()
     });
+    return json({ success: true });
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function getWordCloudEndpoint(request, env) {
+  try {
+    const words = await getWordCloud(env);
+    return json({
+      updated_at: new Date().toISOString(),
+      words: words
+    });
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function updateWordCloudEndpoint(request, env) {
+  if (request.headers.get("X-Local-Worker-Key") !== env.LOCAL_WORKER_KEY) {
+    return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Expected JSON request body" }, { status: 400 });
+  }
+
+  if (!Array.isArray(body.phrases)) {
+    return json({ error: "Expected phrases array" }, { status: 400 });
+  }
+
+  try {
+    await updateWordCloud(env, body.phrases);
     return json({ success: true });
   } catch (error) {
     return json({ error: error.message }, { status: 500 });

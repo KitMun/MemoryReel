@@ -1211,20 +1211,29 @@ LOCAL WORKER SETUP
   See local-worker/README.md for detailed setup instructions.
 
   Prerequisites:
-  - Python 3.10+, ffmpeg
-  - Backblaze B2 credentials
+  - Python 3.10+, ffmpeg (must be in PATH)
+  - Backblaze B2 credentials (application key with read/write access)
   - Cloudflare Worker with D1 database
 
   Configuration (local-worker/config.json):
   - worker_api_url: Deployed Worker URL
   - local_worker_key: Shared secret (matches Worker secret)
-  - B2 credentials and bucket name
+  - b2_key_id, b2_application_key: B2 credentials
+  - b2_bucket_name: B2 bucket name
   - whisper_model: medium (recommended for Mandarin)
+  - poll_interval_seconds: Polling frequency (default: 30)
 
   Running the worker:
   cd local-worker
   pip install -r requirements.txt
   python main.py
+
+  The worker includes debug logging to track progress through each step:
+  - Job polling and status updates
+  - B2 download/upload operations
+  - Audio extraction with ffmpeg
+  - Transcription progress (every 10 segments)
+  - Clip segment suggestion calculation
 
 DEPLOYMENT STEPS
   1. Create D1 database:
@@ -1285,6 +1294,293 @@ ERROR HANDLING
   - Jobs marked as failed with error_message
   - Automatic retry up to 3 times (retry_count field)
   - Worker continues polling for other jobs if one fails
+
+
+================================================================================
+13. LIVE WORD CLOUD — IMPLEMENTATION PREPARATION
+================================================================================
+
+Before implementing the live word cloud page, prepare the following items so that the frontend can remain lightweight and only be responsible for rendering.
+
+### 13.1 Define the Data Contract
+
+The website should consume a processed JSON object rather than the raw Whisper transcript.
+
+Each processed recording should contain:
+
+* Recording ID
+* Timestamp
+* Clip duration
+* Extracted phrases
+* Phrase scores
+* Matched keywords
+
+Example:
+
+```json
+{
+  "id": "",
+  "created_at": "2026-08-03T10:15:30Z",
+  "duration": 24.3,
+  "phrases": [
+    {
+      "text": "祝你們百年好合",
+      "start": 2.1,
+      "end": 4.6,
+      "score": 9,
+      "keywords": [
+        "百年好合"
+      ]
+    }
+  ]
+}
+```
+
+The frontend should never need to parse Whisper timestamps directly.
+
+---
+
+### 13.2 Decide What Appears in the Word Cloud
+
+Recommended approach:
+
+Display only curated wedding blessing phrases that are detected in the transcript.
+
+Examples:
+
+* 百年好合
+* 新婚快樂
+* 永浴愛河
+* 白頭偕老
+* 幸福
+* 幸福美滿
+* 長長久久
+* 相親相愛
+
+Avoid displaying every transcript token, as this produces a noisy and less meaningful word cloud.
+
+---
+
+### 13.3 Prepare the Wedding Blessing Dictionary
+
+Create a curated list of approximately 15–20 common Mandarin wedding blessing phrases reviewed by a native Mandarin speaker.
+
+Example structure:
+
+```json
+[
+    {
+        "phrase": "百年好合",
+        "weight": 2
+    },
+    {
+        "phrase": "幸福",
+        "weight": 1
+    }
+]
+```
+
+Optional weights allow more meaningful phrases to contribute more strongly than generic words.
+
+---
+
+### 13.4 Prepare Couple Information
+
+Store the couple's names in both Chinese characters and pinyin.
+
+Example:
+
+```json
+{
+    "groom": "王小明",
+    "bride": "陳美玲",
+    "groomPinyin": "wangxiaoming",
+    "bridePinyin": "chenmeiling"
+}
+```
+
+These values will be used for:
+
+* Whisper prompt hints
+* Pinyin fuzzy matching
+* Name detection
+* Highlight phrase scoring
+
+---
+
+### 13.5 Live Data Store Format
+
+Rather than exposing complete transcripts, maintain a lightweight aggregated dataset containing phrase frequencies.
+
+Example:
+
+```json
+{
+    "updated_at": "...",
+    "words": [
+        {
+            "text": "百年好合",
+            "count": 18
+        },
+        {
+            "text": "幸福",
+            "count": 26
+        },
+        {
+            "text": "新婚快樂",
+            "count": 14
+        }
+    ]
+}
+```
+
+The website should periodically fetch this dataset and re-render the cloud.
+
+---
+
+### 13.6 Duplicate Handling
+
+If multiple guests say the same blessing phrase:
+
+* Do not create duplicate entries.
+* Increment the frequency count instead.
+
+Example:
+
+```
+百年好合
+↓
+
+count = 27
+```
+
+The word cloud size should be determined by frequency.
+
+---
+
+### 13.7 Word Lifetime
+
+Recommended behaviour:
+
+Keep all detected phrases for the entire wedding.
+
+Do not gradually remove or decay older words, allowing the cloud to grow throughout the event and reflect the collective wishes of all guests.
+
+---
+
+### 13.8 Chinese Font Preparation
+
+The word cloud must use a font with complete Chinese glyph support.
+
+Recommended fonts:
+
+* Noto Sans SC
+* Source Han Sans
+
+Verify rendering on:
+
+* Chrome
+* Safari
+* iPhone
+* Android
+
+---
+
+### 13.9 Word Cloud Rendering Library
+
+Choose the rendering library before implementation.
+
+Candidate libraries:
+
+* wordcloud2.js
+* react-wordcloud
+* d3-cloud
+
+A canvas-based renderer is recommended for smooth live updates and good performance on Cloudflare Pages.
+
+---
+
+### 13.10 Live Update Frequency
+
+Recommended pipeline:
+
+```
+Guest uploads clip
+        │
+        ▼
+Cloudflare Worker
+        │
+        ▼
+Transcription + phrase extraction
+        │
+        ▼
+Update aggregated word counts
+        │
+        ▼
+Save latest JSON
+        │
+        ▼
+Website polls every 3–5 seconds
+        │
+        ▼
+Word cloud re-renders
+```
+
+Polling every few seconds provides a responsive "live" experience without excessive rendering.
+
+---
+
+### 13.11 Animation Behaviour
+
+When new phrases arrive:
+
+* Fade new phrases into the cloud.
+* Smoothly enlarge existing phrases as their frequency increases.
+* Avoid rebuilding the entire layout unnecessarily.
+
+The objective is to make the display feel continuously alive throughout the reception.
+
+---
+
+### 13.12 Content Filtering
+
+Apply basic filtering before updating the cloud.
+
+Ignore:
+
+* Empty transcripts
+* Very short phrases
+* Laughter-only clips
+* Filler speech
+* Repeated meaningless sounds
+* Low-confidence transcription results (if confidence metrics are available)
+
+Only meaningful wedding blessings should contribute to the cloud.
+
+---
+
+### 13.13 Test Dataset
+
+Prepare a small collection of sample transcripts before the wedding for regression testing.
+
+Include examples such as:
+
+* Standard wedding blessings
+* Mixed Mandarin and English
+* Couple name mentions
+* Long pauses
+* Background noise
+* Laughter
+* Repeated blessing phrases
+
+Run every software update against the same dataset to verify that:
+
+* Phrase extraction remains accurate.
+* Keyword matching behaves correctly.
+* Frequency counts are updated correctly.
+* Live rendering continues to function as expected.
+
+This dataset should be reviewed by a native Mandarin speaker before the wedding to validate transcript quality and overall user experience.
 
 ================================================================================
 END OF DOCUMENT
