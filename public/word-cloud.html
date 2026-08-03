@@ -13,50 +13,63 @@
 
         body {
             font-family: 'Microsoft YaHei', 'SimHei', 'PingFang SC', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background: #F8F6F2;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
             padding: 20px;
+            overflow: hidden;
         }
 
         .container {
-            background: rgba(255, 255, 255, 0.95);
+            background: #FFFFFF;
             border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px 40px;
+            box-shadow: 0 10px 40px rgba(126, 143, 116, 0.15);
             max-width: 1200px;
             width: 100%;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #DCE5DA;
         }
 
         h1 {
             text-align: center;
-            color: #333;
-            margin-bottom: 10px;
+            color: #7E8F74;
+            margin-bottom: 5px;
             font-size: 2.5em;
+            flex-shrink: 0;
+            font-weight: 300;
+            letter-spacing: 2px;
         }
 
         .subtitle {
             text-align: center;
-            color: #666;
-            margin-bottom: 30px;
+            color: #BBC7B4;
+            margin-bottom: 15px;
             font-size: 1.1em;
+            flex-shrink: 0;
+            font-weight: 300;
+            letter-spacing: 1px;
         }
 
         #word-cloud {
             width: 100%;
-            height: 600px;
+            flex: 1;
+            min-height: 0;
             border-radius: 10px;
-            background: #fafafa;
+            background: #F8F6F2;
+            border: 1px solid #DCE5DA;
         }
 
         .last-updated {
             text-align: center;
-            color: #999;
-            margin-top: 20px;
+            color: #BBC7B4;
+            margin-top: 10px;
             font-size: 0.9em;
+            flex-shrink: 0;
+            font-weight: 300;
         }
 
         .loading {
@@ -76,8 +89,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>💒 婚礼祝福词云</h1>
-        <p class="subtitle">Wedding Blessings Word Cloud</p>
+        <h1>💒 祝福墙</h1>
+        <p class="subtitle">Congrats wall</p>
         <div id="word-cloud"></div>
         <p class="last-updated" id="last-updated">Loading...</p>
     </div>
@@ -121,12 +134,11 @@
                     layoutAnimation: true,
                     textStyle: {
                         fontFamily: 'Microsoft YaHei, SimHei, PingFang SC, Noto Sans CJK, sans-serif',
-                        fontWeight: 'bold',
+                        fontWeight: 'normal',
                         color: function () {
                             const colors = [
-                                '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
-                                '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
-                                '#BB8FCE', '#85C1E9', '#F8B500', '#FF69B4'
+                                '#7E8F74', '#BBC7B4', '#DCE5DA', '#A8B89D',
+                                '#9AAE8F', '#8FA682', '#7E8F74', '#6B7A62'
                             ];
                             return colors[Math.floor(Math.random() * colors.length)];
                         }
