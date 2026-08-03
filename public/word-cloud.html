@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wedding Wishes - Live Word Cloud</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'SimHei', 'PingFang SC', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        #word-cloud {
+            width: 100%;
+            height: 600px;
+            border-radius: 10px;
+            background: #fafafa;
+        }
+
+        .last-updated {
+            text-align: center;
+            color: #999;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            font-size: 1.2em;
+        }
+
+        .error {
+            text-align: center;
+            color: #e74c3c;
+            padding: 40px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💒 婚礼祝福词云</h1>
+        <p class="subtitle">Wedding Blessings Word Cloud</p>
+        <div id="word-cloud"></div>
+        <p class="last-updated" id="last-updated">Loading...</p>
+    </div>
+
+    <!-- ECharts and echarts-wordcloud -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
+
+    <script>
+        const WORKER_API_URL = '/api/word-cloud';
+        const POLL_INTERVAL = 5000; // 5 seconds
+
+        let chart = null;
+        let lastData = null;
+
+        function initChart() {
+            const chartDom = document.getElementById('word-cloud');
+            chart = echarts.init(chartDom);
+
+            const option = {
+                tooltip: {
+                    show: true,
+                    formatter: function (params) {
+                        return `${params.name}: ${params.value} 次`;
+                    }
+                },
+                series: [{
+                    type: 'wordCloud',
+                    shape: 'circle',
+                    left: 'center',
+                    top: 'center',
+                    width: '90%',
+                    height: '85%',
+                    right: null,
+                    bottom: null,
+                    sizeRange: [20, 80],
+                    rotationRange: [-45, 45],
+                    rotationStep: 15,
+                    gridSize: 8,
+                    drawOutOfBound: false,
+                    layoutAnimation: true,
+                    textStyle: {
+                        fontFamily: 'Microsoft YaHei, SimHei, PingFang SC, Noto Sans CJK, sans-serif',
+                        fontWeight: 'bold',
+                        color: function () {
+                            const colors = [
+                                '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+                                '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
+                                '#BB8FCE', '#85C1E9', '#F8B500', '#FF69B4'
+                            ];
+                            return colors[Math.floor(Math.random() * colors.length)];
+                        }
+                    },
+                    emphasis: {
+                        focus: 'self',
+                        textStyle: {
+                            shadowBlur: 10,
+                            shadowColor: '#333'
+                        }
+                    },
+                    data: []
+                }]
+            };
+
+            chart.setOption(option);
+
+            // Resize handler
+            window.addEventListener('resize', () => {
+                chart.resize();
+            });
+        }
+
+        async function fetchWordCloud() {
+            try {
+                const response = await fetch(WORKER_API_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching word cloud:', error);
+                throw error;
+            }
+        }
+
+        function updateChart(data) {
+            if (!chart) return;
+
+            // Check if data has changed
+            const currentDataStr = JSON.stringify(data.words);
+            if (currentDataStr === JSON.stringify(lastData)) {
+                console.log('Data unchanged, skipping update');
+                return;
+            }
+
+            lastData = data.words;
+
+            // Transform data for echarts-wordcloud format
+            const chartData = data.words.map(item => ({
+                name: item.text,
+                value: item.count
+            }));
+
+            // Update chart
+            chart.setOption({
+                series: [{
+                    data: chartData
+                }]
+            });
+
+            // Update last updated time
+            const lastUpdated = document.getElementById('last-updated');
+            const updateTime = new Date(data.updated_at);
+            lastUpdated.textContent = `Last updated: ${updateTime.toLocaleString('zh-CN')}`;
+        }
+
+        async function loadWordCloud() {
+            try {
+                const data = await fetchWordCloud();
+                updateChart(data);
+            } catch (error) {
+                console.error('Error loading word cloud:', error);
+                const lastUpdated = document.getElementById('last-updated');
+                lastUpdated.textContent = 'Error loading word cloud. Retrying...';
+            }
+        }
+
+        function startPolling() {
+            // Initial load
+            loadWordCloud();
+
+            // Poll for updates
+            setInterval(loadWordCloud, POLL_INTERVAL);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            startPolling();
+        });
+    </script>
+</body>
+</html>
