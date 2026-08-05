@@ -193,7 +193,7 @@
 
                     // Update video
                     const videoWrapper = document.getElementById('video-wrapper');
-                    videoWrapper.innerHTML = `<video controls autoplay loop><source src="${data.reel_url}" type="video/mp4"></video>`;
+                    videoWrapper.innerHTML = `<video controls autoplay muted loop playsinline><source src="${data.reel_url}" type="video/mp4"></video>`;
 
                     // Update info
                     document.getElementById('version').textContent = `v${data.version}`;
