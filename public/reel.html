@@ -16,7 +16,6 @@
             font-family: 'Microsoft YaHei', SimHei, PingFang SC, Noto Sans CJK, sans-serif;
             height: 100vh;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 20px;
@@ -28,38 +27,47 @@
             border-radius: 20px;
             padding: 30px;
             box-shadow: 0 10px 40px rgba(126, 143, 116, 0.15);
-            max-width: 500px;
+            max-width: 1400px;
             width: 100%;
             display: flex;
-            flex-direction: column;
             align-items: center;
+            gap: 30px;
             border: 1px solid #DCE5DA;
             position: relative;
         }
 
+        .left-panel {
+            flex: 0 0 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .right-panel {
+            flex: 0 0 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
         h1 {
-            text-align: center;
             color: #7E8F74;
             margin-bottom: 5px;
-            font-size: 2em;
-            flex-shrink: 0;
+            font-size: 1.8em;
             font-weight: 300;
             letter-spacing: 2px;
         }
 
         .subtitle {
-            text-align: center;
             color: #BBC7B4;
-            margin-bottom: 20px;
-            font-size: 1em;
-            flex-shrink: 0;
+            font-size: 0.9em;
             font-weight: 300;
             letter-spacing: 1px;
         }
 
         .video-wrapper {
-            width: 100%;
-            max-height: 70vh;
+            flex: 1;
+            max-height: 85vh;
             background: #F8F6F2;
             border-radius: 15px;
             border: 1px solid #DCE5DA;
@@ -71,52 +79,32 @@
         }
 
         video {
-            max-height: 70vh;
+            max-height: 85vh;
             max-width: 100%;
             object-fit: contain;
             border-radius: 15px;
         }
 
-        .mute-button {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(126, 143, 116, 0.8);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            cursor: pointer;
-            font-size: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.3s;
-            z-index: 10;
-        }
-
-        .mute-button:hover {
-            background: rgba(126, 143, 116, 1);
-        }
-
-        .info-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 20px;
-            padding: 15px 20px;
+        .info-panel {
             background: #F8F6F2;
             border-radius: 10px;
             border: 1px solid #DCE5DA;
-            flex-shrink: 0;
-            width: 100%;
+            padding: 15px;
+        }
+
+        .info-panel h3 {
+            color: #7E8F74;
+            font-size: 0.9em;
+            font-weight: 400;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
         }
 
         .info-item {
             color: #7E8F74;
             font-size: 0.85em;
             font-weight: 300;
+            margin-bottom: 8px;
         }
 
         .info-item span {
@@ -184,18 +172,25 @@
         <div class="corner-decoration bottom-left"></div>
         <div class="corner-decoration bottom-right"></div>
 
-        <h1>精彩瞬间</h1>
-        <p class="subtitle">Highlight Reel</p>
+        <div class="left-panel">
+            <div class="info-panel">
+                <h1>精彩瞬间</h1>
+                <p class="subtitle">Highlight Reel</p>
+            </div>
+        </div>
 
         <div class="video-wrapper" id="video-wrapper">
             <div class="loading">加载中... Loading...</div>
         </div>
 
-        <div class="info-bar">
-            <div class="info-item">版本 <span id="version">-</span></div>
-            <div class="info-item">片段数 <span id="segment-count">-</span></div>
-            <div class="info-item">时长 <span id="duration">-</span></div>
-            <div class="info-item">更新时间 <span id="updated-at">-</span></div>
+        <div class="right-panel">
+            <div class="info-panel">
+                <h3>播放信息</h3>
+                <div class="info-item">版本 <span id="version">-</span></div>
+                <div class="info-item">时长 <span id="duration">-</span></div>
+                <div class="info-item">片段数 <span id="segment-count">-</span></div>
+                <div class="info-item">更新时间 <span id="updated-at">-</span></div>
+            </div>
         </div>
     </div>
 
@@ -227,23 +222,7 @@
                         <video id="reel-video" controls autoplay playsinline>
                             <source src="${data.reel_url}" type="video/mp4">
                         </video>
-                        <button class="mute-button" id="mute-btn" title="Unmute">🔇</button>
                     `;
-
-                    // Add mute button functionality
-                    const video = document.getElementById('reel-video');
-                    const muteBtn = document.getElementById('mute-btn');
-
-                    muteBtn.addEventListener('click', () => {
-                        video.muted = !video.muted;
-                        muteBtn.textContent = video.muted ? '🔇' : '🔊';
-                    });
-
-                    // Auto-unmute on user interaction
-                    video.addEventListener('click', () => {
-                        video.muted = false;
-                        muteBtn.textContent = '🔊';
-                    });
 
                     // Update info
                     document.getElementById('version').textContent = `v${data.version}`;
