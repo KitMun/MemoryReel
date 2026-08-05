@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wedding Wishes - Live Word Cloud</title>
+    <title>祝福墙 - 不负眷顾 终木成林</title>
     <style>
         * {
             margin: 0;
@@ -32,6 +32,7 @@
             display: flex;
             flex-direction: column;
             border: 1px solid #DCE5DA;
+            position: relative;
         }
 
         h1 {
@@ -85,15 +86,122 @@
             padding: 40px;
             font-size: 1.2em;
         }
+
+        /* ===============================
+        Wedding Floral Decorations
+        ==================================*/
+
+        :root{
+            --sage:#A8B89D;
+            --sage-dark:#7E8F74;
+            --leaf:#6F8A67;
+            --leaf2:#8DA084;
+            --white:#ffffff;
+            --cream:#F8F6F2;
+            --blue:#D9E7F2;
+        }
+
+        /* keep decorations behind content */
+        .container > *{
+            position: relative;
+            z-index: 2;
+        }
+
+        .floral{
+            position:absolute;
+            background-repeat:no-repeat;
+            background-size:contain;
+            background-position:center;
+            pointer-events:none;
+        }
+
+        .floral-top-left{
+            z-index:999;
+            width:280px;
+            height:170px;
+            left:-10px;
+            top:-20px;
+            background-image:url("./resource/top-left.png");
+        }
+
+        .floral-top-right{
+            z-index:999;
+            width:250px;
+            height:150px;
+            right:30px;
+            top:-10px;
+            background-image:url("./resource/top-right.png");
+        }
+
+        .floral-bottom-left{
+            width:220px;
+            height:120px;
+            left:-10px;
+            bottom:-20px;
+            background-image:url("./resource/bottom-left.png");
+        }
+
+        .floral-bottom-right{
+            width:270px;
+            height:120px;
+            right:-10px;
+            bottom:-20px;
+            background-image:url("./resource/bottom-right.png");
+        }
+
+        .vine-left{
+            visibility:collapse;
+            z-index:999;
+            position:absolute;
+            left:-20px;
+            top:110px;
+            width:160px;
+            height:420px;
+            background:url("./resource/vine-left.png") no-repeat center/contain;
+        }
+
+        .vine-right{
+            visibility:collapse;
+            z-index:999;
+            position:absolute;
+            right:10px;
+            top:110px;
+            width:170px;
+            height:420px;
+            background:url("./resource/vine-right.png") no-repeat center/contain;
+        }
+        
+        .bottom-garland{
+            visibility:collapse;
+            height:42px;
+            margin-top:10px;
+            border-radius:30px;
+            background:
+                radial-gradient(circle at 20px 20px,#6F8A67 0 10px,transparent 11px),
+                radial-gradient(circle at 45px 12px,#8FA682 0 8px,transparent 9px),
+                radial-gradient(circle at 70px 22px,#7E8F74 0 10px,transparent 11px);
+            background-size:90px 42px;
+            opacity:.85;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>祝福墙</h1>
-        <p class="subtitle">Congrats wall</p>
+        <h1>不负眷顾 终木成林</h1>
+        <p class="subtitle">Kit Mun & Yong Xuan</p>
         <div id="word-cloud"></div>
+        <div class="bottom-garland"></div>
         <p class="last-updated" id="last-updated">Loading...</p>
     </div>
+
+    <!-- Decorative Florals -->
+    <div class="floral floral-top-left"></div>
+    <div class="floral floral-top-right"></div>
+    <div class="floral floral-bottom-left"></div>
+    <div class="floral floral-bottom-right"></div>
+
+    <div class="vine vine-left"></div>
+    <div class="vine vine-right"></div>
 
     <!-- ECharts and echarts-wordcloud -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
