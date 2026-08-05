@@ -92,6 +92,14 @@ async function addReelVersion(env, reelData) {
   ).all();
 }
 
+async function getReelVersion(env, version) {
+  const stmt = env.DB.prepare(
+    "SELECT * FROM reel_versions WHERE version = ?"
+  );
+  const result = await stmt.bind(version).first();
+  return result;
+}
+
 async function getLastReelVersion(env) {
   const stmt = env.DB.prepare(
     "SELECT * FROM reel_versions ORDER BY version DESC LIMIT 1"
@@ -107,13 +115,8 @@ async function getCurrentReel(env) {
   const result = await stmt.first();
   if (!result) return null;
 
-  // Construct B2 public URL for the reel
-  const bucketName = env.B2_BUCKET_NAME;
-  if (!bucketName) {
-    console.error("B2_BUCKET_NAME not set in worker secrets");
-    return { error: "B2 bucket name not configured" };
-  }
-  const reelUrl = `https://f004.backblazeb2.com/file/${bucketName}/${result.reel_path}`;
+  // Use worker proxy endpoint for private bucket access
+  const reelUrl = `/api/reel/video/${result.version}`;
 
   return {
     version: result.version,
@@ -186,6 +189,10 @@ export default {
 
     if (url.pathname === "/api/reel/current" && request.method === "GET") {
       return getCurrentReelEndpoint(request, env);
+    }
+
+    if (url.pathname.match(/^\/api\/reel\/video\/\d+$/) && request.method === "GET") {
+      return getReelVideoEndpoint(request, env);
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -584,5 +591,43 @@ async function getCurrentReelEndpoint(request, env) {
     return json(reel || { error: "No reel available" });
   } catch (error) {
     return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function getReelVideoEndpoint(request, env) {
+  const url = new URL(request.url);
+  const version = url.pathname.split('/')[3];
+
+  try {
+    const reelVersion = await getReelVersion(env, version);
+    if (!reelVersion) {
+      return new Response("Reel version not found", { status: 404 });
+    }
+
+    // Authorize with B2
+    const authorized = await authorizeB2(env);
+
+    // Download file from B2
+    const downloadUrl = `${authorized.apiInfo.storageApi.apiUrl}/b2api/v3/b2_download_file_by_name?bucketId=${authorized.apiInfo.storageApi.bucketId}&fileName=${encodeURIComponent(reelVersion.reel_path)}`;
+
+    const response = await fetch(downloadUrl, {
+      headers: {
+        'Authorization': authorized.authorizationToken
+      }
+    });
+
+    if (!response.ok) {
+      return new Response(`Failed to download reel: ${response.statusText}`, { status: 500 });
+    }
+
+    // Stream the response back to client
+    return new Response(response.body, {
+      headers: {
+        'Content-Type': 'video/mp4',
+        'Cache-Control': 'public, max-age=3600'
+      }
+    });
+  } catch (error) {
+    return new Response(`Error: ${error.message}`, { status: 500 });
   }
 }
