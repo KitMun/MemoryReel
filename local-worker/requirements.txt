@@ -1,0 +1,4 @@
+faster-whisper
+b2sdk
+requests
+python-dotenv

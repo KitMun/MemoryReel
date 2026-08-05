@@ -1,0 +1,8 @@
+config.json
+downloads/
+transcripts/
+*.wav
+*.webm
+*.mp4
+__pycache__/
+*.pyc
