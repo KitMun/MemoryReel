@@ -17,6 +17,8 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
             overflow: hidden;
         }
@@ -24,13 +26,13 @@
         .container {
             background: #FFFFFF;
             border-radius: 20px;
-            padding: 20px 40px;
+            padding: 30px;
             box-shadow: 0 10px 40px rgba(126, 143, 116, 0.15);
-            max-width: 1400px;
+            max-width: 500px;
             width: 100%;
-            flex: 1;
             display: flex;
             flex-direction: column;
+            align-items: center;
             border: 1px solid #DCE5DA;
             position: relative;
         }
@@ -39,7 +41,7 @@
             text-align: center;
             color: #7E8F74;
             margin-bottom: 5px;
-            font-size: 2.5em;
+            font-size: 2em;
             flex-shrink: 0;
             font-weight: 300;
             letter-spacing: 2px;
@@ -48,46 +50,72 @@
         .subtitle {
             text-align: center;
             color: #BBC7B4;
-            margin-bottom: 15px;
-            font-size: 1.1em;
+            margin-bottom: 20px;
+            font-size: 1em;
             flex-shrink: 0;
             font-weight: 300;
             letter-spacing: 1px;
         }
 
         .video-wrapper {
-            flex: 1;
-            min-height: 0;
+            width: 100%;
+            max-height: 70vh;
             background: #F8F6F2;
-            border-radius: 10px;
+            border-radius: 15px;
             border: 1px solid #DCE5DA;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            position: relative;
         }
 
         video {
-            width: 100%;
-            height: 100%;
+            max-height: 70vh;
+            max-width: 100%;
             object-fit: contain;
+            border-radius: 15px;
+        }
+
+        .mute-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(126, 143, 116, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+            z-index: 10;
+        }
+
+        .mute-button:hover {
+            background: rgba(126, 143, 116, 1);
         }
 
         .info-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 15px;
+            margin-top: 20px;
             padding: 15px 20px;
             background: #F8F6F2;
             border-radius: 10px;
             border: 1px solid #DCE5DA;
             flex-shrink: 0;
+            width: 100%;
         }
 
         .info-item {
             color: #7E8F74;
-            font-size: 0.9em;
+            font-size: 0.85em;
             font-weight: 300;
         }
 
@@ -101,6 +129,7 @@
             color: #BBC7B4;
             font-size: 1.2em;
             font-weight: 300;
+            padding: 40px;
         }
 
         .error {
@@ -108,40 +137,41 @@
             color: #e74c3c;
             font-size: 1.2em;
             font-weight: 300;
+            padding: 40px;
         }
 
         .corner-decoration {
             position: absolute;
-            width: 40px;
-            height: 40px;
+            width: 30px;
+            height: 30px;
             border: 1px solid #DCE5DA;
             opacity: 0.5;
         }
 
         .corner-decoration.top-left {
-            top: 25px;
-            left: 25px;
+            top: 20px;
+            left: 20px;
             border-right: none;
             border-bottom: none;
         }
 
         .corner-decoration.top-right {
-            top: 25px;
-            right: 25px;
+            top: 20px;
+            right: 20px;
             border-left: none;
             border-bottom: none;
         }
 
         .corner-decoration.bottom-left {
-            bottom: 25px;
-            left: 25px;
+            bottom: 20px;
+            left: 20px;
             border-right: none;
             border-top: none;
         }
 
         .corner-decoration.bottom-right {
-            bottom: 25px;
-            right: 25px;
+            bottom: 20px;
+            right: 20px;
             border-left: none;
             border-top: none;
         }
@@ -193,7 +223,27 @@
 
                     // Update video
                     const videoWrapper = document.getElementById('video-wrapper');
-                    videoWrapper.innerHTML = `<video controls autoplay muted loop playsinline><source src="${data.reel_url}" type="video/mp4"></video>`;
+                    videoWrapper.innerHTML = `
+                        <video id="reel-video" controls autoplay playsinline>
+                            <source src="${data.reel_url}" type="video/mp4">
+                        </video>
+                        <button class="mute-button" id="mute-btn" title="Unmute">🔇</button>
+                    `;
+
+                    // Add mute button functionality
+                    const video = document.getElementById('reel-video');
+                    const muteBtn = document.getElementById('mute-btn');
+
+                    muteBtn.addEventListener('click', () => {
+                        video.muted = !video.muted;
+                        muteBtn.textContent = video.muted ? '🔇' : '🔊';
+                    });
+
+                    // Auto-unmute on user interaction
+                    video.addEventListener('click', () => {
+                        video.muted = false;
+                        muteBtn.textContent = '🔊';
+                    });
 
                     // Update info
                     document.getElementById('version').textContent = `v${data.version}`;
