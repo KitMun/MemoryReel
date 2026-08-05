@@ -604,15 +604,21 @@ async function getReelVideoEndpoint(request, env) {
       return new Response("Reel version " + version + " not found", { status: 404 });
     }
 
-    // Authorize with B2
-    const authorized = await authorizeB2(env);
+    // Authorize with B2 to get full auth info
+    const authResponse = await authorizeB2(env);
 
-    // Download file from B2
-    const downloadUrl = `${authorized.apiInfo.storageApi.apiUrl}/b2api/v3/b2_download_file_by_name?bucketId=${authorized.apiInfo.storageApi.bucketId}&fileName=${encodeURIComponent(reelVersion.reel_path)}`;
+    // Get bucket ID from env
+    const bucketId = env.B2_BUCKET_ID;
+    if (!bucketId) {
+      return new Response("B2_BUCKET_ID not configured", { status: 500 });
+    }
+
+    // Download file from B2 using the friendly URL with auth
+    const downloadUrl = `${authResponse.apiUrl}/b2api/v3/b2_download_file_by_name?bucketId=${bucketId}&fileName=${encodeURIComponent(reelVersion.reel_path)}`;
 
     const response = await fetch(downloadUrl, {
       headers: {
-        'Authorization': authorized.authorizationToken
+        'Authorization': authResponse.authorizationToken
       }
     });
 
