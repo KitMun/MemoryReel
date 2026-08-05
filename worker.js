@@ -108,9 +108,12 @@ async function getCurrentReel(env) {
   if (!result) return null;
 
   // Construct B2 public URL for the reel
-  // Use the bucket name from env or fallback to a default
-  const bucketName = env.B2_BUCKET_NAME || env.B2_BUCKET_ID || '20260919';
-  const reelUrl = `https://f005.backblazeb2.com/file/${bucketName}/${result.reel_path}`;
+  const bucketName = env.B2_BUCKET_NAME;
+  if (!bucketName) {
+    console.error("B2_BUCKET_NAME not set in worker secrets");
+    return { error: "B2 bucket name not configured" };
+  }
+  const reelUrl = `https://f004.backblazeb2.com/file/${bucketName}/${result.reel_path}`;
 
   return {
     version: result.version,
