@@ -115,7 +115,8 @@ async function getCurrentReel(env) {
   const result = await stmt.first();
   if (!result) return null;
 
-  // Use worker proxy endpoint for private bucket access
+  // Return reel metadata with reel_path
+  // Use worker proxy endpoint for authenticated B2 access
   const reelUrl = `/api/reel/video/${result.version}`;
 
   return {
@@ -604,21 +605,31 @@ async function getReelVideoEndpoint(request, env) {
       return new Response("Reel version " + version + " not found", { status: 404 });
     }
 
-    // Authorize with B2 to get full auth info
-    const authResponse = await authorizeB2(env);
+    // Authorize with B2
+    const authResponse = await fetch(
+      "https://api.backblazeb2.com/b2api/v3/b2_authorize_account",
+      {
+        headers: {
+          'Authorization': 'Basic ' + btoa(env.B2_KEY_ID + ':' + env.B2_APPLICATION_KEY)
+        }
+      }
+    );
 
-    // Get bucket ID from env
-    const bucketId = env.B2_BUCKET_ID;
-    if (!bucketId) {
-      return new Response("B2_BUCKET_ID not configured", { status: 500 });
+    if (!authResponse.ok) {
+      return new Response("B2 authorization failed", { status: 401 });
     }
 
-    // Download file from B2 using the friendly URL with auth
-    const downloadUrl = `${authResponse.apiUrl}/b2api/v3/b2_download_file_by_name?bucketId=${bucketId}&fileName=${encodeURIComponent(reelVersion.reel_path)}`;
+    const authData = await authResponse.json();
+    const bucketName = env.B2_BUCKET_NAME;
+    if (!bucketName) {
+      return new Response("B2_BUCKET_NAME not configured", { status: 500 });
+    }
+
+    const downloadUrl = `${authData.apiInfo.storageApi.apiUrl}/file/${bucketName}/${reelVersion.reel_path}`;
 
     const response = await fetch(downloadUrl, {
       headers: {
-        'Authorization': authResponse.authorizationToken
+        'Authorization': authData.authorizationToken
       }
     });
 
