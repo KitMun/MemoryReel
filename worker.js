@@ -601,7 +601,7 @@ async function getReelVideoEndpoint(request, env) {
   try {
     const reelVersion = await getReelVersion(env, version);
     if (!reelVersion) {
-      return new Response("Reel version not found", { status: 404 });
+      return new Response("Reel version " + version + " not found", { status: 404 });
     }
 
     // Authorize with B2
