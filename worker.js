@@ -108,7 +108,9 @@ async function getCurrentReel(env) {
   if (!result) return null;
 
   // Construct B2 public URL for the reel
-  const reelUrl = `https://f005.backblazeb2.com/file/${env.B2_BUCKET_NAME}/${result.reel_path}`;
+  // Use the bucket name from env or fallback to a default
+  const bucketName = env.B2_BUCKET_NAME || env.B2_BUCKET_ID || '20260919';
+  const reelUrl = `https://f005.backblazeb2.com/file/${bucketName}/${result.reel_path}`;
 
   return {
     version: result.version,
