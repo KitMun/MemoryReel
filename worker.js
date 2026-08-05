@@ -47,6 +47,78 @@ async function updateWordCloud(env, phrases) {
   }
 }
 
+async function addToReelManifest(env, segmentData) {
+  const now = new Date().toISOString();
+  const stmt = env.DB.prepare(
+    "INSERT INTO reel_manifest (job_id, segment_path, start_ms, end_ms, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  );
+  await stmt.bind(
+    segmentData.job_id,
+    segmentData.segment_path,
+    segmentData.start_ms,
+    segmentData.end_ms,
+    segmentData.duration_ms,
+    now
+  ).all();
+}
+
+async function getReelSegments(env) {
+  const stmt = env.DB.prepare(
+    "SELECT * FROM reel_manifest ORDER BY created_at ASC"
+  );
+  const results = await stmt.all();
+  return results.results;
+}
+
+async function getNextReelVersion(env) {
+  const stmt = env.DB.prepare(
+    "SELECT COALESCE(MAX(version), 0) + 1 as next_version FROM reel_versions"
+  );
+  const result = await stmt.first();
+  return result.next_version;
+}
+
+async function addReelVersion(env, reelData) {
+  const now = new Date().toISOString();
+  const stmt = env.DB.prepare(
+    "INSERT INTO reel_versions (version, reel_path, segment_count, total_duration_ms, created_at) VALUES (?, ?, ?, ?, ?)"
+  );
+  await stmt.bind(
+    reelData.version,
+    reelData.reel_path,
+    reelData.segment_count,
+    reelData.total_duration_ms,
+    now
+  ).all();
+}
+
+async function getLastReelVersion(env) {
+  const stmt = env.DB.prepare(
+    "SELECT * FROM reel_versions ORDER BY version DESC LIMIT 1"
+  );
+  const result = await stmt.first();
+  return result;
+}
+
+async function getCurrentReel(env) {
+  const stmt = env.DB.prepare(
+    "SELECT * FROM reel_versions ORDER BY version DESC LIMIT 1"
+  );
+  const result = await stmt.first();
+  if (!result) return null;
+
+  // Construct B2 public URL for the reel
+  const reelUrl = `https://f005.backblazeb2.com/file/${env.B2_BUCKET_NAME}/${result.reel_path}`;
+
+  return {
+    version: result.version,
+    reel_url: reelUrl,
+    segment_count: result.segment_count,
+    total_duration_ms: result.total_duration_ms,
+    created_at: result.created_at
+  };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -85,6 +157,30 @@ export default {
 
     if (url.pathname === "/api/word-cloud/update" && request.method === "POST") {
       return updateWordCloudEndpoint(request, env);
+    }
+
+    if (url.pathname === "/api/reel/manifest" && request.method === "POST") {
+      return addToReelManifestEndpoint(request, env);
+    }
+
+    if (url.pathname === "/api/reel/segments" && request.method === "GET") {
+      return getReelSegmentsEndpoint(request, env);
+    }
+
+    if (url.pathname === "/api/reel/next-version" && request.method === "GET") {
+      return getNextReelVersionEndpoint(request, env);
+    }
+
+    if (url.pathname === "/api/reel/version" && request.method === "POST") {
+      return addReelVersionEndpoint(request, env);
+    }
+
+    if (url.pathname === "/api/reel/last-version" && request.method === "GET") {
+      return getLastReelVersionEndpoint(request, env);
+    }
+
+    if (url.pathname === "/api/reel/current" && request.method === "GET") {
+      return getCurrentReelEndpoint(request, env);
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -393,6 +489,94 @@ async function updateWordCloudEndpoint(request, env) {
   try {
     await updateWordCloud(env, body.phrases);
     return json({ success: true });
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function addToReelManifestEndpoint(request, env) {
+  if (request.headers.get("X-Local-Worker-Key") !== env.LOCAL_WORKER_KEY) {
+    return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Expected JSON request body" }, { status: 400 });
+  }
+
+  try {
+    await addToReelManifest(env, body);
+    return json({ success: true });
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function getReelSegmentsEndpoint(request, env) {
+  if (request.headers.get("X-Local-Worker-Key") !== env.LOCAL_WORKER_KEY) {
+    return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const segments = await getReelSegments(env);
+    return json(segments);
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function getNextReelVersionEndpoint(request, env) {
+  if (request.headers.get("X-Local-Worker-Key") !== env.LOCAL_WORKER_KEY) {
+    return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const version = await getNextReelVersion(env);
+    return json({ version });
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function addReelVersionEndpoint(request, env) {
+  if (request.headers.get("X-Local-Worker-Key") !== env.LOCAL_WORKER_KEY) {
+    return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Expected JSON request body" }, { status: 400 });
+  }
+
+  try {
+    await addReelVersion(env, body);
+    return json({ success: true });
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function getLastReelVersionEndpoint(request, env) {
+  if (request.headers.get("X-Local-Worker-Key") !== env.LOCAL_WORKER_KEY) {
+    return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const lastVersion = await getLastReelVersion(env);
+    return json(lastVersion || null);
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+
+async function getCurrentReelEndpoint(request, env) {
+  try {
+    const reel = await getCurrentReel(env);
+    return json(reel || { error: "No reel available" });
   } catch (error) {
     return json({ error: error.message }, { status: 500 });
   }
