@@ -596,7 +596,7 @@ async function getCurrentReelEndpoint(request, env) {
 
 async function getReelVideoEndpoint(request, env) {
   const url = new URL(request.url);
-  const version = url.pathname.split('/')[3];
+  const version = url.pathname.split('/')[4];
 
   try {
     const reelVersion = await getReelVersion(env, version);
