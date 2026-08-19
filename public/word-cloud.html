@@ -16,9 +16,19 @@
             background: #F8F6F2;
             height: 100vh;
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
+            gap: 20px;
             overflow: hidden;
+        }
+
+        .main-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+            height: 100%;
         }
 
         .container {
@@ -26,13 +36,66 @@
             border-radius: 20px;
             padding: 20px 40px;
             box-shadow: 0 10px 40px rgba(126, 143, 116, 0.15);
-            max-width: 1200px;
-            width: 100%;
-            flex: 1;
+            flex: 4;
+            height: 100%;
             display: flex;
             flex-direction: column;
             border: 1px solid #DCE5DA;
             position: relative;
+            min-width: 0;
+        }
+
+        .instructions-panel {
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(126, 143, 116, 0.15);
+            flex: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #DCE5DA;
+            min-width: 0;
+        }
+
+        .instructions-panel h2 {
+            color: #7E8F74;
+            font-size: 1.5em;
+            font-weight: 300;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        .instructions-panel h3 {
+            color: #7E8F74;
+            font-size: 1.1em;
+            font-weight: 400;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .instructions-panel p {
+            color: #666;
+            font-size: 0.95em;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .instructions-panel .step {
+            background: #F8F6F2;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 3px solid #7E8F74;
+        }
+
+        .instructions-panel .step-number {
+            color: #7E8F74;
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 5px;
         }
 
         h1 {
@@ -128,7 +191,7 @@
             z-index:999;
             width:250px;
             height:150px;
-            right:30px;
+            right:-10px;
             top:-10px;
             background-image:url("./resource/top-right.png");
         }
@@ -186,12 +249,43 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>不负眷顾 终木成林</h1>
-        <p class="subtitle">Kit Mun & Yong Xuan</p>
-        <div id="word-cloud"></div>
-        <div class="bottom-garland"></div>
-        <p class="last-updated" id="last-updated">Loading...</p>
+    <div class="main-wrapper">
+        <div class="container">
+            <h1>不负眷顾 终木成林</h1>
+            <p class="subtitle">Kit Mun & Yong Xuan</p>
+            <div id="word-cloud"></div>
+            <div class="bottom-garland"></div>
+            <p class="last-updated" id="last-updated">Loading...</p>
+        </div>
+
+        <div class="instructions-panel">
+            <h2>祝福说明</h2>
+
+            <div class="step">
+                <div class="step-number">步骤 1</div>
+                <p>在录音亭找到录音设备</p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">步骤 2</div>
+                <p>按下录音按钮开始录制您的祝福</p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">步骤 3</div>
+                <p>说出您对新人的祝福语</p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">步骤 4</div>
+                <p>再次按下按钮结束录制</p>
+            </div>
+
+            <h3>温馨提示</h3>
+            <p>• 请保持安静的环境录制</p>
+            <p>• 祝福语时长建议在 10-30 秒</p>
+            <p>• 您的祝福将实时显示在词云中</p>
+        </div>
     </div>
 
     <!-- Decorative Florals -->
